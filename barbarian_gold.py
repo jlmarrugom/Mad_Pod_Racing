@@ -16,27 +16,37 @@ def move_1step_ahead(
     step_y = round(wf*future_goal[1] + wp*present_goal[1])
     return step_x, step_y
 
-def n_pod_mov(e0, v0):
+#Using game physics
+def n_pod_mov(e0: float, v0:float) -> int:
+    """Calculates the next pod's position"""
     friction = 0.85
     ef = e0 + friction*v0
     return round(ef)
-def n_pod_v(v0,a):
+def n_pod_v(v0:float, a:float)-> float:
+    """Calculates the next pod's speed"""
     v = v0 + a
     return v
 
-def step_correction(steps,error):
+def step_correction(steps:list,error:list)->tuple:
+    """Substracts an error amount from the calculated step"""
     return (steps[0]-error[0], steps[1]-error[1])    
 
-def turns_to_point(ef:list, e:list, v:list, thrust_vec:list):
+
+def turns_to_point(ef:list, e:list, v:list, thrust_vec:list) -> int:
+    """Using the game physics, calculates in how many t's the pod will reach the checkpoint"""
+    #starting at t = 0 (this turn)
     for t in range(100):
         dist = math.dist(e,ef)
+        #If checkpoint is reached
         if dist<=600:
             return t
+        #if not, we calculate the next pod position, and speed, then check again
         e = [n_pod_mov(e_,v_) for e_,v_ in zip(e,v)]
         v = [n_pod_v(v_, thrust_) for v_,thrust_ in zip(v,thrust_vec)]
     return 101
 
-def get_first_op_id(pods_next_check):
+def get_first_op_id(pods_next_check:list)->int:
+    """Returns the Id of the first opponent's Pod"""
     if pods_next_check[2][0] < pods_next_check[3][0]:
         id= 3
     elif pods_next_check[2][0] > pods_next_check[3][0]:
@@ -54,7 +64,8 @@ def get_first_op_id(pods_next_check):
             else: id = 2
     return id
 
-def get_my_last_id(pods_next_check):
+def get_my_last_id(pods_next_check:list):
+    """Returns the Id of my last Pod"""
     if pods_next_check[0][0] < pods_next_check[1][0]:
         id= 0
     elif pods_next_check[0][0] > pods_next_check[1][0]:
@@ -71,7 +82,8 @@ def get_my_last_id(pods_next_check):
                 id= 0 
             else: id = 0
     return id
-    
+
+#We'll save the Checkpoints on a List to anticipate them
 checkpoints = []
 
 laps = int(input())
@@ -80,13 +92,14 @@ for i in range(checkpoint_count):
     checkpoint_x, checkpoint_y = [int(j) for j in input().split()]
     checkpoints += [(checkpoint_x, checkpoint_y)]
 
+#We define the game lists: [x, y]
 boost_flag = True
 orders=["", ""]
 pod_pos=[[0,0],[0,0]]
 pod_speed=[[0,0],[0,0]]
 op_speed=[[0,0],[0,0]]
 pod_orientation=[[0.0,0.0],[0.0,0.0]]
-#lap, checkpoint_id, check_dist
+#each list represents: [lap, checkpoint_id, check_dist]
 pods_next_check=[[0,0,0], [0,0,0], [0,0,0], [0,0,0]]
 
 next_pod_pos=[[0,0],[0,0]]
@@ -97,11 +110,12 @@ future_checkpoint_2 = [[0,0],[0,0]]
 thrust = 0
 # game loop
 while True:
+    #My pod's status
     for i in range(2):
         x, y, vx, vy, angle, next_check_point_id = [int(j) for j in input().split()]
 
         pod_pos[i] = [x,y]
-        #save positions
+        #save positions to then verify who is first and who is last >:)
         if next_check_point_id!=pods_next_check[i][1]:
             pods_next_check[i][1] = next_check_point_id
             if pods_next_check[i][1] == 0:
@@ -111,6 +125,7 @@ while True:
         pod_orientation[i] = [1*math.cos(math.radians(angle)), 1*math.sin(math.radians(angle))]
 
         next_checkpoint = checkpoints[next_check_point_id]
+        #We calculate the position of the next checkpoint relative to the Pod
         rel_next_check = [x-y for x,y in zip(next_checkpoint, pod_pos[i])]
         #save dist to check
         pods_next_check[i][2] = round(math.dist(pod_pos[i], next_checkpoint))
@@ -131,6 +146,7 @@ while True:
         thrust_x, thrust_y = [thrust*pod_orientation[i][0], thrust*pod_orientation[i][1]]
         next_pod_pos[i] = [n_pod_mov(x,vx), n_pod_mov(y,vy)]
 
+        #We calculate the number of remaining turns to make decisions
         rem_turns = turns_to_point(next_checkpoint, pod_pos[i], pod_speed[i], [thrust_x, thrust_y])
 
         if rem_turns<=1:
@@ -149,15 +165,18 @@ while True:
             wp, wf = 1.0, 0.0
             thrust= 'BOOST'
         
+        #We correct of direction depending on the thrust, remaining turns, and velocity (Should be improved)
         step_x, step_y = step_correction(
                 move_1step_ahead(
                     wp, wf,
                     next_checkpoint,
                     future_checkpoint),
                     [0.05*rem_turns*vx +thrust_x*0.5, 0.05*rem_turns*vy+thrust_y*0.5])
+        
+        #We save the orders on a list before printing it, so we could modify them after looking at the opponets 
         orders[i]=(f"{round(step_x)} {round(step_y)} {thrust}")
     
-    
+    #Opponents Status
     for i in range(2):
         x_2, y_2, vx_2, vy_2, angle_2, next_check_point_id_2 = [int(j) for j in input().split()]
         op_pos[i] = [x_2, y_2]
@@ -179,7 +198,7 @@ while True:
         #save dist to check
         pods_next_check[i+2][2] = round(math.dist(op_pos[i], next_checkpoint_2[i]))
 
-        #Defense
+        #Defense against opponents Pods
         for k, pos in enumerate(pod_pos):
             next_opponent_dist = math.dist(next_opponent_pos[i], next_pod_pos[k])
             orientation_sim = cosine_similarity(
@@ -187,8 +206,10 @@ while True:
                 [[vx_2, vy_2]]).item()
             order_list = orders[k].split(" ")
 
-            #last pod attact first opponent
+            #My last pod attacts first opponent's Pod
+            #Dirty ship offense
             if k == get_my_last_id(pods_next_check):
+                #What is his first Pod's Id?
                 f_op_id = get_first_op_id(pods_next_check)-2
                 f_opponent_dist = math.dist(next_opponent_pos[f_op_id], next_pod_pos[k])
                 f_op_orientation_sim = cosine_similarity(
@@ -197,7 +218,7 @@ while True:
                 op_dist_to_check = math.dist(next_checkpoint_2[f_op_id],op_pos[f_op_id])
                 my_dist_to_op_check = math.dist(next_checkpoint_2[f_op_id], next_pod_pos[k])
                 
-                #if op near
+                #if opponent is near:
                 if (f_opponent_dist <= 1500): #1500
                     step_x, step_y = step_correction(
                         [round(
@@ -229,6 +250,7 @@ while True:
                 else:
                     orders[k]=(f"{step_x} {step_y} {thrust}")
                 
+                #If future opponent will hit us
                 if (f_opponent_dist <= 810):
                     #Adjustment to opponent if hit
                     order_list = orders[k].split(" ")
@@ -237,14 +259,17 @@ while True:
                         [op_speed[f_op_id][0], op_speed[f_op_id][1]])
                     orders[k]=(f"{step_x} {step_y} {'SHIELD'}")
 
+                #If our dirty ship encounters our clean ship 
                 if math.dist(next_pod_pos[0], next_pod_pos[1])<810:
                     order_list = orders[k].split(" ")
                     step_x, step_y = step_correction(
                         [int(order_list[0]), int(order_list[1])], 
                         [pod_speed[k-1][0], pod_speed[k-1]][1])
                     orders[k]=(f"{step_x} {step_y} {0}")
+            
+            #Clean ship defense
             else:
-
+                #If the'll collide at a very different angle
                 if (next_opponent_dist <= 810) and orientation_sim<=0.5:
                     #Adjustment to opponent if hit
                     order_list = orders[k].split(" ")
@@ -252,7 +277,7 @@ while True:
                         [int(order_list[0]), int(order_list[1])], [vx_2, vy_2])
                     orders[k]=(f"{step_x} {step_y} {'SHIELD'}")
                 
-                #adjust to oponent
+                #adjust to oponent's collisions
                 if (next_opponent_dist <= 1000):
                     order_list = orders[k].split(" ")
                     step_x, step_y = step_correction(
