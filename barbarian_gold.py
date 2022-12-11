@@ -291,7 +291,7 @@ while True:
                         [int(order_list[0]), int(order_list[1])], 
                         [pod_speed[k-1][0], pod_speed[k-1]][1])
                     orders[k]=(f"{step_x} {step_y} {order_list[2]}")
-
+    #Give orders to the Pods
     for order in orders:
         print(order)
     
